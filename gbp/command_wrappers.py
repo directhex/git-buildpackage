@@ -141,7 +141,7 @@ class UnpackTarArchive(Command):
         else:
             decompress = "--gzip"
 
-        Command.__init__(self, 'tar', exclude + ['-C', dir, decompress, '-xf', archive ])
+        Command.__init__(self, 'tar', exclude + ['-C', dir, '--strip=1', decompress, '-xf', archive ])
         self.run_error = 'Couldn\'t unpack "%s"' % self.archive
 
 

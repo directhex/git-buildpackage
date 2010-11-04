@@ -229,11 +229,11 @@ def main(argv):
                 args.append(tarball)
 
         # tarball specified
-        if len(args) != 1:
+        if len(args) < 1:
             parser.print_help()
             raise GbpError
         else:
-            archive = args[0]
+            archives = args
 
         try:
             repo = GitRepository('.')
@@ -259,12 +259,12 @@ on howto create it otherwise use --upstream-branch to specify it.
         if options.version:
             version = options.version
         else:
-            version = guess_upstream_version(archive)
+            version = guess_upstream_version(archives[0])
 
         if version:
             print "Upstream version is %s" % version
         else:
-            print >>sys.stderr, "Cannot determine upstream version from %s - use -u <version>" % archive
+            print >>sys.stderr, "Cannot determine upstream version from %s - use -u <version>" % archives[0]
             parser.print_help()
             raise GbpError
 
@@ -273,15 +273,15 @@ on howto create it otherwise use --upstream-branch to specify it.
             print >>sys.stderr, "Repository has uncommitted changes, commit these first: "
             raise GbpError, out
 
-        if os.path.isdir(archive):
-            orig_dir = archive
+        if os.path.isdir(archives[0]):
+            orig_dir = archives[0]
             turn_off_fastimport(options, "Fastimport only supported for tar achives.")
         else:
             if not options.fast_import:
                 tmpdir = tempfile.mkdtemp(dir='../')
-                unpack_orig(archive, tmpdir, options.filters)
+                unpack_orig(archives, tmpdir, options.filters)
                 if options.verbose:
-                    print "Unpacked %s to '%s'" % (archive , tmpdir)
+                    print "Unpacked %s to '%s'" % (archives[0] , tmpdir)
                 orig_dir = tar_toplevel(tmpdir)
 
                 # Don't mess up or repo with git metadata from an upstream tarball
@@ -301,16 +301,16 @@ on howto create it otherwise use --upstream-branch to specify it.
                     repack_orig(archive, tmpdir, os.path.basename(orig_dir))
             try:
                 cp = parse_changelog('debian/changelog')
-                pristine_orig = symlink_orig(archive, cp['Source'], version)
+                pristine_orig = symlink_orig(archives[0], cp['Source'], version)
             except NoChangelogError:
                 print "Warning: Can't symlink orig tarball due to missing debian/changelog"
-                pristine_orig = archive
+                pristine_orig = archives[0]
 
         try:
             upstream_branch = [ options.upstream_branch, 'master' ][is_empty]
             filter_msg = ["", " (filtering out %s)"
                               % options.filters][len(options.filters) > 0]
-            print "Importing '%s' to branch '%s'%s..." % (archive,
+            print "Importing '%s' to branch '%s'%s..." % (archives[0],
                                                           upstream_branch,
                                                           filter_msg)
             if options.fast_import:
@@ -327,7 +327,7 @@ on howto create it otherwise use --upstream-branch to specify it.
                 if pristine_orig:
                     gbpc.PristineTar().commit(pristine_orig, 'refs/heads/%s' % upstream_branch)
                 else:
-                    print >>sys.stderr, "Warning: '%s' not an archive, skipping pristine-tar" % archive
+                    print >>sys.stderr, "Warning: '%s' not an archive, skipping pristine-tar" % archives[0]
 
             tag = build_tag(options.upstream_tag, version)
             gbpc.GitTag(options.sign_tags, options.keyid)(tag,
@@ -353,7 +353,7 @@ on howto create it otherwise use --upstream-branch to specify it.
                     env = { 'GBP_BRANCH': options.debian_branch }
                     cmd = gbpc.Command(options.postimport % info, extra_env=env, shell=True)()
         except gbpc.CommandExecFailed:
-            raise GbpError, "Import of %s failed" % archive
+            raise GbpError, "Import of %s failed" % archives[0]
     except GbpNothingImported, err:
         print >>sys.stderr, err
         repo.set_branch(initial_branch)
@@ -367,7 +367,7 @@ on howto create it otherwise use --upstream-branch to specify it.
         cleanup_tmp_tree(tmpdir)
 
     if not ret:
-        print "Succesfully imported version %s of %s" % (version, archive)
+        print "Succesfully imported version %s of %s" % (version, archives[0])
     return ret
 
 if __name__ == "__main__":

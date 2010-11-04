@@ -6,6 +6,7 @@
 import commands
 import email
 import os
+import copy
 import re
 import shutil
 import subprocess
@@ -270,14 +271,21 @@ def do_uscan():
         return (True, tarball)
 
 
-def unpack_orig(archive, tmpdir, filters):
+def unpack_orig(originalarchives, tmpdir, filters):
     """
     unpack a .orig.tar.gz to tmpdir, leave the cleanup to the caller in case of
     an error
     """
+    archives = copy.copy(originalarchives)
+    archive = archives.pop(0)
     try:
         unpackArchive = gbpc.UnpackTarArchive(archive, tmpdir, filters)
         unpackArchive()
+        if len(archives) > 0:
+            for archive in archives:
+                multiArchive = gbpc.UnpackTarArchive(archive, tmpdir + "/" + multitar_component(archive), filters)
+                os.mkdir(tmpdir + "/" + multitar_component(archive))
+                multiArchive()
     except gbpc.CommandExecFailed:
         print >>sys.stderr, "Unpacking of %s failed" % archive
         raise GbpError
@@ -352,6 +360,12 @@ def guess_upstream_version(archive, version_regex=r''):
         m = re.match(filter, os.path.basename(archive))
         if m:
             return m.group('version')
+
+def multitar_component(archive):
+    """return the value of <component> for multi-tar use"""
+    m = re.match(r'.*\.orig\-(?P<dirname>[a-zA-Z\d\-]*)\.tar\.(gz|bz2)',os.path.basename(archive))
+    if m:
+        return m.group('dirname')
 
 
 def compare_versions(version1, version2):
